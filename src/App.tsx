@@ -80,7 +80,15 @@ export default function App() {
   };
 
   const handleAddExpense = (amountCents: number, category: string) => {
-    const { weekData: updated } = addExpense(selectedWeekKey, amountCents, category);
+    // 10. Si el usuario estaba en la semana actual y cambió la semana a medianoche,
+    // sincronizar con la semana real del momento para no dejar el gasto huérfano
+    const nowWeekKey = getWeekKey(new Date());
+    const targetKey = isCurrentWeek ? nowWeekKey : selectedWeekKey;
+    if (isCurrentWeek && selectedWeekKey !== nowWeekKey) {
+      setSelectedWeekKey(nowWeekKey);
+    }
+
+    const { weekData: updated } = addExpense(targetKey, amountCents, category);
     setWeekData(updated);
     showToast('Gasto anotado con éxito.', 'success');
   };

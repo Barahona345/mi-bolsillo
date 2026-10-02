@@ -42,6 +42,16 @@ export const GoalModal: React.FC<GoalModalProps> = ({
     e.preventDefault();
     const cents = parseInputToCents(inputValue);
 
+    if (cents === -1) {
+      setErrorMessage('Por favor, ingresá como máximo dos números decimales para los centavos.');
+      return;
+    }
+
+    if (cents === -2) {
+      setErrorMessage('La meta semanal no puede superar los $10,000.00.');
+      return;
+    }
+
     if (cents <= 0) {
       setErrorMessage('Por favor, ingresá un monto mayor a cero para fijar tu meta.');
       return;
@@ -99,10 +109,14 @@ export const GoalModal: React.FC<GoalModalProps> = ({
               </span>
               <input
                 id="weekly-goal-input"
-                type="number"
-                step="0.01"
-                min="1"
+                type="text"
+                inputMode="decimal"
                 value={inputValue}
+                onKeyDown={(e) => {
+                  if (['e', 'E', '+', '-'].includes(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
                 onChange={(e) => {
                   setInputValue(e.target.value);
                   setErrorMessage('');

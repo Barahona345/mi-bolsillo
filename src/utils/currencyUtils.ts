@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Límite máximo para gastos o meta semanal: $10,000.00 (1,000,000 de centavos)
+export const MAX_AMOUNT_CENTS = 1_000_000;
+
 /**
  * Convierte centavos enteros a formato legible con signo de dólar ($X.XX).
  * Ejemplo: 100 centavos -> "$1.00", 2000 centavos -> "$20.00"
@@ -25,16 +28,37 @@ export function formatCentsCompact(cents: number): string {
 }
 
 /**
- * Parsea un input de texto de usuario (ej: "12", "12.50", "12,5", "$20") a CENTAVOS ENTEROS.
- * Evita errores comunes de punto flotante de JavaScript mediante Math.round(val * 100).
+ * Parsea un input de texto de usuario a CENTAVOS ENTEROS de forma estricta.
+ * Soporta coma decimal ("5,50"), rechaza negativos, ceros y números astronómicos.
  */
 export function parseInputToCents(input: string): number {
-  if (!input) return 0;
-  // Limpiar caracteres extraños, reemplazar comas por puntos
-  const clean = input.replace(/[^0-9.,]/g, '').replace(',', '.');
-  const floatVal = parseFloat(clean);
+  if (!input || typeof input !== 'string') return 0;
+
+  // Reemplazar coma por punto y quitar espacios
+  const trimmed = input.trim().replace(',', '.');
+
+  // Validar formato numérico estándar (hasta 2 decimales opcionales)
+  // Rechaza texto con letras, notación científica 'e' o múltiples puntos
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) {
+    // Si tiene más de dos decimales o caracteres no permitidos, intentamos evaluar si es parseable
+    const parts = trimmed.split('.');
+    if (parts.length === 2 && parts[1].length > 2) {
+      // Tiene más de 2 decimales
+      return -1; // Código especial de error: más de 2 decimales
+    }
+  }
+
+  const floatVal = parseFloat(trimmed);
   if (isNaN(floatVal) || floatVal <= 0) {
     return 0;
   }
-  return Math.round(floatVal * 100);
+
+  const cents = Math.round(floatVal * 100);
+
+  // Evitar números gigantescos
+  if (cents > MAX_AMOUNT_CENTS) {
+    return -2; // Código especial: excede límite máximo permitido ($10,000)
+  }
+
+  return cents;
 }

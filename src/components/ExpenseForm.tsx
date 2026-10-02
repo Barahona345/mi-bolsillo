@@ -17,6 +17,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense, isWeekEm
   const [amountInput, setAmountInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Comida');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Iconos representativos para cada categoría
   const getCategoryIcon = (name: string) => {
@@ -38,7 +39,21 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense, isWeekEm
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 8. Evitar doble clic rápido / multi-submit
+    if (isSubmitting) return;
+
     const cents = parseInputToCents(amountInput);
+
+    if (cents === -1) {
+      setErrorMessage('Por favor, ingresá como máximo dos números decimales para los centavos (ej: 5.50).');
+      return;
+    }
+
+    if (cents === -2) {
+      setErrorMessage('El monto supera el límite máximo permitido de $10,000.00 por gasto.');
+      return;
+    }
 
     if (cents <= 0) {
       setErrorMessage('Por favor, escribí un monto mayor a cero para anotar el gasto.');
@@ -50,9 +65,15 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense, isWeekEm
       return;
     }
 
+    setIsSubmitting(true);
     onAddExpense(cents, selectedCategory);
     setAmountInput('');
     setErrorMessage('');
+
+    // Liberar botón tras 400ms para evitar registros duplicados por toques rápidos
+    setTimeout(() => {
+      setIsSubmitting(false);
+    }, 400);
   };
 
   return (
@@ -98,10 +119,14 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense, isWeekEm
             {/* Texto nunca menor a 16px (evita zoom automático en celulares) */}
             <input
               id="expense-amount-input"
-              type="number"
-              step="0.01"
-              min="0.01"
+              type="text"
+              inputMode="decimal"
               value={amountInput}
+              onKeyDown={(e) => {
+                if (['e', 'E', '+', '-'].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
               onChange={(e) => {
                 setAmountInput(e.target.value);
                 setErrorMessage('');

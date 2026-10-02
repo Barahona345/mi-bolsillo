@@ -71,9 +71,22 @@ export function getAllStoredData(): AllWeeksStorage {
  */
 export function getWeekData(weekKey: string): WeekData {
   const all = getAllStoredData();
-  if (all[weekKey]) {
-    return all[weekKey];
+  const rawWeek = all[weekKey];
+
+  if (rawWeek && typeof rawWeek === 'object') {
+    return {
+      goalCents:
+        typeof rawWeek.goalCents === 'number' && !isNaN(rawWeek.goalCents)
+          ? Math.max(0, Math.round(rawWeek.goalCents))
+          : 0,
+      expenses: Array.isArray(rawWeek.expenses)
+        ? rawWeek.expenses.filter(
+            (e) => e && typeof e.id === 'string' && typeof e.amountCents === 'number' && e.amountCents > 0
+          )
+        : [],
+    };
   }
+
   return {
     goalCents: 0,
     expenses: [],
