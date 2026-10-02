@@ -11,6 +11,10 @@ import {
   saveWeeklyGoal,
   addExpense,
   removeExpense,
+  exportDataAsJSONFile,
+  clearWeekExpenses,
+  SAMPLE_INITIAL_DATA,
+  getAllStoredData,
 } from './services/storageService';
 import { analyzeWeekWithAI, isCategoryProtected } from './services/aiService';
 import { SemaforoCard } from './components/SemaforoCard';
@@ -25,6 +29,9 @@ import {
   ChevronRight,
   Calendar,
   AlertCircle,
+  Download,
+  RotateCcw,
+  HardDrive,
 } from 'lucide-react';
 
 export default function App() {
@@ -76,6 +83,28 @@ export default function App() {
   const handleDeleteExpense = (id: string) => {
     const updated = removeExpense(selectedWeekKey, id);
     setWeekData(updated);
+  };
+
+  const handleExportBackup = () => {
+    exportDataAsJSONFile();
+    setToastNotice('Descargando archivo JSON con el respaldo de tus gastos...');
+    setTimeout(() => setToastNotice(null), 3000);
+  };
+
+  const handleResetToSample = () => {
+    localStorage.setItem('mi_bolsillo_data_v1', JSON.stringify(SAMPLE_INITIAL_DATA));
+    setWeekData(getWeekData(selectedWeekKey));
+    setToastNotice('Datos de ejemplo cargados: Meta $20.00, Comida $12.00, Ocio $5.00, Transporte $4.00.');
+    setTimeout(() => setToastNotice(null), 4000);
+  };
+
+  const handleClearWeek = () => {
+    if (confirm('¿Querés borrar los gastos de esta semana? (La meta se mantiene)')) {
+      const updated = clearWeekExpenses(selectedWeekKey);
+      setWeekData(updated);
+      setToastNotice('Gastos de la semana borrados.');
+      setTimeout(() => setToastNotice(null), 3000);
+    }
   };
 
   // Botón "Revisar mi semana" (Sello de IA)
@@ -258,6 +287,38 @@ export default function App() {
               expenses={weekData.expenses}
               onDeleteExpense={handleDeleteExpense}
             />
+          </section>
+
+          {/* Gestión de datos y copia de seguridad (localStorage) */}
+          <section className="bg-white rounded-3xl p-4 shadow-sm border border-slate-200">
+            <div className="flex items-center gap-2 mb-2">
+              <HardDrive className="w-4 h-4 text-slate-500" />
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Copia y almacenamiento local
+              </h3>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+              Tus gastos y metas quedan guardados en la memoria local de tu navegador (localStorage). Podés descargar una copia de seguridad en archivo .json en cualquier momento.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleExportBackup}
+                className="py-2.5 px-3 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                title="Descargar copia de seguridad en JSON"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Exportar (.json)</span>
+              </button>
+
+              <button
+                onClick={handleResetToSample}
+                className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                title="Cargar datos de ejemplo para pruebas"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                <span>Cargar ejemplo</span>
+              </button>
+            </div>
           </section>
         </main>
 

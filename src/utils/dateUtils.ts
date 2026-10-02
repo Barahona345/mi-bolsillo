@@ -4,68 +4,60 @@
  */
 
 /**
- * Retorna la clave de semana tipo "2026-W40" en hora local (semana de lunes a domingo).
- * Sigue el estándar ISO 8601 donde la semana inicia el lunes.
+ * Retorna la fecha del lunes correspondiente a la semana de la fecha dada (en hora local).
+ * La semana va de lunes a domingo.
  */
-export function getWeekKey(d: Date = new Date()): string {
-  // Crear fecha local sin horas para evitar problemas de desfase horario
+export function getMondayOfWeek(d: Date = new Date()): Date {
   const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-
-  // En JS: Domingo=0, Lunes=1, ..., Sábado=6.
-  // Convertimos a: Lunes=1 ... Domingo=7
-  const dayNr = target.getDay() === 0 ? 7 : target.getDay();
-
-  // El jueves de la misma semana determina el año ISO
-  target.setDate(target.getDate() + 4 - dayNr);
-  const yearStart = new Date(target.getFullYear(), 0, 1);
-
-  // Calcular el número de semana
-  const dayOfYear = Math.floor((target.getTime() - yearStart.getTime()) / 86400000) + 1;
-  const weekNumber = Math.ceil(dayOfYear / 7);
-
-  const year = target.getFullYear();
-  const weekPadded = String(weekNumber).padStart(2, '0');
-
-  return `${year}-W${weekPadded}`;
+  const day = target.getDay(); // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+  // Si es domingo (0), retroceder 6 días. Si es lunes (1), 0 días. Si es martes (2), 1 día, etc.
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  target.setDate(target.getDate() + diffToMonday);
+  return target;
 }
 
 /**
- * Obtiene el rango de fechas (Lunes a Domingo) para una clave de semana "YYYY-Www".
+ * Retorna la clave de la semana usando la fecha del lunes en formato "YYYY-MM-DD".
+ * Ejemplo para la semana actual: "2026-09-28"
+ */
+export function getWeekKey(d: Date = new Date()): string {
+  const monday = getMondayOfWeek(d);
+  const year = monday.getFullYear();
+  const month = String(monday.getMonth() + 1).padStart(2, '0');
+  const day = String(monday.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Obtiene el rango de fechas (Lunes a Domingo) para una clave de semana "YYYY-MM-DD".
  */
 export function getWeekDateRange(weekKey: string): { start: Date; end: Date; label: string } {
-  const parts = weekKey.split('-W');
-  const year = parseInt(parts[0], 10);
-  const week = parseInt(parts[1], 10);
+  // Manejo de compatibilidad en caso de formato "YYYY-MM-DD"
+  const [yearStr, monthStr, dayStr] = weekKey.split('-');
+  const monday = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10) - 1, parseInt(dayStr, 10));
 
-  // 4 de enero siempre está en la semana 1 según ISO
-  const jan4 = new Date(year, 0, 4);
-  const jan4Day = jan4.getDay() === 0 ? 7 : jan4.getDay();
-
-  // Lunes de la semana 1
-  const week1Monday = new Date(year, 0, 4 - jan4Day + 1);
-
-  // Lunes de la semana solicitada
-  const targetMonday = new Date(week1Monday.getTime() + (week - 1) * 7 * 86400000);
-  const targetSunday = new Date(targetMonday.getTime() + 6 * 86400000);
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
 
   const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
-  const startStr = targetMonday.toLocaleDateString('es-ES', options);
-  const endStr = targetSunday.toLocaleDateString('es-ES', { ...options, year: 'numeric' });
+  const startStr = monday.toLocaleDateString('es-ES', options);
+  const endStr = sunday.toLocaleDateString('es-ES', { ...options, year: 'numeric' });
 
   return {
-    start: targetMonday,
-    end: targetSunday,
+    start: monday,
+    end: sunday,
     label: `${startStr} - ${endStr}`,
   };
 }
 
 /**
- * Cambia la semana en un delta (-1 para anterior, +1 para siguiente).
+ * Cambia la semana en un delta (-1 para semana anterior, +1 para semana siguiente).
  */
-export function shiftWeekKey(weekKey: string, delta: number): string {
-  const range = getWeekDateRange(weekKey);
-  const newDate = new Date(range.start.getTime() + delta * 7 * 86400000);
-  return getWeekKey(newDate);
+export function shiftWeekKey(weekKey: string, deltaWeeks: number): string {
+  const { start } = getWeekDateRange(weekKey);
+  const nextDate = new Date(start);
+  nextDate.setDate(nextDate.getDate() + deltaWeeks * 7);
+  return getWeekKey(nextDate);
 }
 
 /**
