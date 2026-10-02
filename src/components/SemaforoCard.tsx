@@ -41,33 +41,35 @@ export const SemaforoCard: React.FC<SemaforoCardProps> = ({
     );
   }
 
-  // Cálculos del semáforo
+  // Cálculos del semáforo con porcentajes requeridos:
+  // - Verde: por debajo del 70 % (< 70%)
+  // - Amarillo: desde el 70 % hasta antes del 100 % (>= 70% y < 100%)
+  // - Rojo: al llegar o pasarse del 100 % (>= 100%)
   const percentage = Math.round((spentCents / goalCents) * 100);
-  const isOver = spentCents > goalCents;
-  const excessCents = isOver ? spentCents - goalCents : 0;
-  const remainingCents = !isOver ? goalCents - spentCents : 0;
+  const excessCents = Math.max(0, spentCents - goalCents);
+  const remainingCents = Math.max(0, goalCents - spentCents);
 
-  // Estado del semáforo:
-  // - 'danger' (Rojo): gastó más del 100% de la meta
-  // - 'warning' (Amarillo): gastó entre 80% y 100% (se acerca a la meta)
-  // - 'safe' (Verde): gastó menos del 80%
   let status: 'safe' | 'warning' | 'danger';
-  if (isOver) {
-    status = 'danger';
-  } else if (percentage >= 80) {
-    status = 'warning';
+  if (spentCents >= goalCents) {
+    status = 'danger'; // Rojo al llegar o pasarse del 100 %
+  } else if (spentCents >= goalCents * 0.7) {
+    status = 'warning'; // Amarillo desde el 70 % hasta antes del 100 %
   } else {
-    status = 'safe';
+    status = 'safe'; // Verde por debajo del 70 %
   }
 
-  // Texto principal del semáforo según el criterio de aceptación:
-  // "veo el semáforo en rojo con 'Te pasaste $1.00'"
+  // Texto principal del semáforo
   let statusHeadline = '';
   let statusSubline = '';
 
   if (status === 'danger') {
-    statusHeadline = `Te pasaste ${formatCents(excessCents)}`;
-    statusSubline = `Superaste tu meta de ${formatCents(goalCents)} por ${formatCents(excessCents)}`;
+    if (excessCents > 0) {
+      statusHeadline = `Te pasaste ${formatCents(excessCents)}`;
+      statusSubline = `Superaste tu meta de ${formatCents(goalCents)} por ${formatCents(excessCents)}`;
+    } else {
+      statusHeadline = `Llegaste a tu meta (${formatCents(goalCents)})`;
+      statusSubline = `Alcanzaste el 100% de tu presupuesto semanal`;
+    }
   } else if (status === 'warning') {
     statusHeadline = `Te quedan ${formatCents(remainingCents)}`;
     statusSubline = `Cuidado, ya usaste el ${percentage}% de tu meta`;
