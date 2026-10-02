@@ -19,34 +19,25 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDeleteExpe
   const getIcon = (category: string) => {
     switch (category) {
       case 'Comida':
-        return <Utensils className="w-4 h-4 text-emerald-600" />;
+        return <Utensils className="w-5 h-5 text-emerald-900" />;
       case 'Transporte':
-        return <Bus className="w-4 h-4 text-emerald-600" />;
+        return <Bus className="w-5 h-5 text-emerald-900" />;
       case 'Útiles':
-        return <BookOpen className="w-4 h-4 text-emerald-600" />;
+        return <BookOpen className="w-5 h-5 text-emerald-900" />;
       case 'Ocio':
-        return <Gamepad2 className="w-4 h-4 text-indigo-600" />;
+        return <Gamepad2 className="w-5 h-5 text-indigo-900" />;
       case 'Snacks & Salidas':
-        return <Coffee className="w-4 h-4 text-amber-600" />;
+        return <Coffee className="w-5 h-5 text-amber-900" />;
       default:
-        return <Tag className="w-4 h-4 text-slate-600" />;
+        return <Tag className="w-5 h-5 text-slate-900" />;
     }
   };
 
   if (expenses.length === 0) {
-    return (
-      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 text-center py-8">
-        <p className="text-slate-400 text-sm font-medium">
-          No hay gastos anotados en esta semana.
-        </p>
-        <p className="text-xs text-slate-400 mt-1">
-          Registrá lo que vayas gastando en el día arriba.
-        </p>
-      </div>
-    );
+    return null; // El estado vacío se muestra junto al formulario según el punto 5
   }
 
-  // Agrupación por categoría para ver los totales rápidos
+  // Agrupación por categoría
   const categoryTotalsMap = expenses.reduce((acc, exp) => {
     acc[exp.category] = (acc[exp.category] || 0) + exp.amountCents;
     return acc;
@@ -54,28 +45,28 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDeleteExpe
 
   return (
     <div className="space-y-4">
-      {/* Resumen por categorías en chips */}
-      <div className="bg-white rounded-3xl p-4 shadow-sm border border-slate-200">
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
+      {/* Resumen por categorías en alto contraste y texto >= 16px */}
+      <div className="bg-white rounded-3xl p-5 border-2 border-slate-900 shadow-sm">
+        <h3 className="text-base font-black text-slate-900 uppercase tracking-wide block mb-3">
           ¿En qué se está yendo el dinero?
-        </span>
-        <div className="flex flex-wrap gap-1.5">
+        </h3>
+        <div className="flex flex-wrap gap-2">
           {Object.entries(categoryTotalsMap).map(([cat, totalCents]) => {
             const isProt = isCategoryProtected(cat);
             return (
               <div
                 key={cat}
-                className={`flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-xl border ${
+                className={`flex items-center gap-2 text-base py-2 px-3.5 rounded-xl border-2 font-bold ${
                   isProt
-                    ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900 font-medium'
-                    : 'bg-slate-50 border-slate-200 text-slate-700'
+                    ? 'bg-emerald-100 border-emerald-900 text-emerald-950'
+                    : 'bg-slate-100 border-slate-900 text-slate-950'
                 }`}
               >
                 <span>{cat}:</span>
-                <span className="font-bold">{formatCents(totalCents)}</span>
+                <span className="font-black">{formatCents(totalCents)}</span>
                 {isProt && (
-                  <span title="Categoría protegida">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 inline" />
+                  <span title="Categoría básica">
+                    <ShieldCheck className="w-5 h-5 text-emerald-900 inline" />
                   </span>
                 )}
               </div>
@@ -85,58 +76,63 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDeleteExpe
       </div>
 
       {/* Historial detallado de gastos */}
-      <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-bold text-slate-800 text-sm">
-            Movimientos ({expenses.length})
+      <div className="bg-white rounded-3xl p-5 sm:p-6 border-2 border-slate-900 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-black text-slate-950">
+            Gastos anotados ({expenses.length})
           </h3>
-          <span className="text-[11px] text-slate-400">Esta semana</span>
+          <span className="text-base font-bold text-slate-800 bg-slate-100 px-3 py-1 rounded-xl border border-slate-400">
+            Esta semana
+          </span>
         </div>
 
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y-2 divide-slate-200">
           {expenses.map((expense) => {
             const isProtected = isCategoryProtected(expense.category);
             return (
               <div
                 key={expense.id}
-                className="py-3 flex items-center justify-between group hover:bg-slate-50/80 -mx-2 px-2 rounded-xl transition-colors"
+                className="py-4 flex items-center justify-between gap-3 group"
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 ${
-                      isProtected ? 'bg-emerald-50' : 'bg-slate-100'
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border-2 ${
+                      isProtected
+                        ? 'bg-emerald-100 border-emerald-900'
+                        : 'bg-slate-100 border-slate-400'
                     }`}
                   >
                     {getIcon(expense.category)}
                   </div>
                   <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-bold text-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-black text-slate-950">
                         {expense.category}
                       </span>
                       {isProtected && (
-                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100/70 px-1.5 py-0.2 rounded-md">
+                        <span className="text-base font-bold text-emerald-950 bg-emerald-200 px-2 py-0.5 rounded-lg border border-emerald-800">
                           Básica
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-base font-bold text-slate-700 block mt-0.5">
                       {formatExpenseDate(expense.date)}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <span className="text-base font-extrabold text-slate-900">
+                  <span className="text-xl font-black text-slate-950">
                     {formatCents(expense.amountCents)}
                   </span>
+                  {/* Botón táctil accesible de mínimo 48x48 px */}
                   <button
                     onClick={() => onDeleteExpense(expense.id)}
-                    className="p-1.5 text-slate-300 hover:text-rose-500 rounded-lg hover:bg-rose-50 transition-colors"
+                    className="min-w-[48px] min-h-[48px] flex items-center justify-center text-slate-600 hover:text-rose-700 active:text-rose-900 rounded-xl hover:bg-rose-50 border border-slate-300 hover:border-rose-400 transition-colors cursor-pointer"
                     title="Eliminar gasto"
-                    aria-label="Eliminar gasto"
+                    aria-label={`Eliminar gasto de ${expense.category} de ${formatCents(expense.amountCents)}`}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-5 h-5" />
                   </button>
                 </div>
               </div>

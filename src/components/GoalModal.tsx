@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { formatCents, parseInputToCents } from '../utils/currencyUtils';
-import { Target, X, Check } from 'lucide-react';
+import { parseInputToCents } from '../utils/currencyUtils';
+import { Target, X, Check, AlertCircle } from 'lucide-react';
 
 interface GoalModalProps {
   isOpen: boolean;
@@ -23,16 +23,16 @@ export const GoalModal: React.FC<GoalModalProps> = ({
   weekLabel,
 }) => {
   const [inputValue, setInputValue] = useState('');
-  const [error, setError] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       if (currentGoalCents > 0) {
         setInputValue((currentGoalCents / 100).toString());
       } else {
-        setInputValue('20'); // Valor sugerido inicial para la semana
+        setInputValue('20');
       }
-      setError('');
+      setErrorMessage('');
     }
   }, [isOpen, currentGoalCents]);
 
@@ -43,7 +43,7 @@ export const GoalModal: React.FC<GoalModalProps> = ({
     const cents = parseInputToCents(inputValue);
 
     if (cents <= 0) {
-      setError('Por favor, ingresá un monto mayor a 0');
+      setErrorMessage('Por favor, ingresá un monto mayor a cero para fijar tu meta.');
       return;
     }
 
@@ -54,70 +54,90 @@ export const GoalModal: React.FC<GoalModalProps> = ({
   const presetGoals = [15, 20, 30, 50];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-100 relative">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="goal-modal-title"
+    >
+      <div className="bg-white w-full max-w-sm rounded-3xl p-5 sm:p-6 border-4 border-slate-900 shadow-2xl relative">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
-          aria-label="Cerrar"
+          className="absolute top-4 right-4 min-w-[48px] min-h-[48px] flex items-center justify-center text-slate-800 hover:text-slate-950 rounded-2xl hover:bg-slate-100 border border-slate-300 transition-colors cursor-pointer"
+          aria-label="Cerrar ventana de meta"
         >
-          <X className="w-5 h-5" />
+          <X className="w-6 h-6" />
         </button>
 
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center">
-            <Target className="w-5 h-5" />
+        <div className="flex items-center gap-3 mb-4 pr-12">
+          <div className="w-12 h-12 bg-emerald-100 text-emerald-950 rounded-2xl flex items-center justify-center border-2 border-emerald-900 shrink-0">
+            <Target className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="font-bold text-slate-800 text-lg">Fijar Meta Semanal</h3>
-            <p className="text-xs text-slate-500">{weekLabel}</p>
+            <h2 id="goal-modal-title" className="font-black text-slate-950 text-xl leading-tight">
+              Fijar meta semanal
+            </h2>
+            <p className="text-base font-semibold text-slate-700">{weekLabel}</p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* 3. Etiqueta visible */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+            <label
+              htmlFor="weekly-goal-input"
+              className="block text-base font-black text-slate-950 mb-2"
+            >
               Presupuesto total para la semana ($)
             </label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-slate-400">
+              <span
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-900"
+                aria-hidden="true"
+              >
                 $
               </span>
               <input
+                id="weekly-goal-input"
                 type="number"
                 step="0.01"
                 min="1"
                 value={inputValue}
                 onChange={(e) => {
                   setInputValue(e.target.value);
-                  setError('');
+                  setErrorMessage('');
                 }}
                 placeholder="20.00"
                 autoFocus
-                className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-2xl font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                className="w-full min-h-[56px] pl-10 pr-4 py-3 bg-slate-50 border-2 border-slate-900 rounded-2xl text-2xl font-black text-slate-950 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-300 transition-all placeholder:text-slate-500"
               />
             </div>
-            {error && <p className="text-xs text-rose-500 mt-1 font-medium">{error}</p>}
+            {/* 6. Mensaje de error sin tecnicismos */}
+            {errorMessage && (
+              <p className="text-base font-bold text-rose-700 mt-2 flex items-center gap-1.5" role="alert">
+                <AlertCircle className="w-5 h-5 shrink-0" />
+                <span>{errorMessage}</span>
+              </p>
+            )}
           </div>
 
-          {/* Accesos rápidos */}
           <div>
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">
-              Valores rápidos
+            <span className="text-base font-bold text-slate-900 block mb-2">
+              Montos rápidos sugeridos:
             </span>
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-4 gap-2">
               {presetGoals.map((val) => (
                 <button
                   type="button"
                   key={val}
                   onClick={() => {
                     setInputValue(val.toString());
-                    setError('');
+                    setErrorMessage('');
                   }}
-                  className={`py-1.5 px-2 rounded-xl text-xs font-semibold border transition-all ${
+                  className={`min-h-[48px] py-2 px-2 rounded-xl text-base font-black border-2 transition-all cursor-pointer ${
                     inputValue === val.toString()
-                      ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      ? 'bg-emerald-200 border-emerald-900 text-emerald-950 shadow-xs'
+                      : 'bg-slate-100 border-slate-400 text-slate-900 hover:bg-slate-200'
                   }`}
                 >
                   ${val}
@@ -126,19 +146,21 @@ export const GoalModal: React.FC<GoalModalProps> = ({
             </div>
           </div>
 
-          <div className="pt-2 flex gap-2">
+          <div className="pt-2 flex flex-col sm:flex-row gap-3">
+            {/* Botón secundario */}
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-2xl text-sm transition-colors"
+              className="min-h-[50px] flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-950 font-bold rounded-2xl text-base border-2 border-slate-400 transition-colors cursor-pointer"
             >
               Cancelar
             </button>
+            {/* 4. Único botón principal de este modal */}
             <button
               type="submit"
-              className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-semibold rounded-2xl text-sm transition-all shadow-md shadow-emerald-200 flex items-center justify-center gap-1.5"
+              className="min-h-[50px] flex-1 py-3 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-2xl text-base border-2 border-emerald-950 transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Check className="w-4 h-4" />
+              <Check className="w-5 h-5" />
               <span>Guardar meta</span>
             </button>
           </div>
