@@ -1,0 +1,7 @@
+{
+  "name": "MI BOLSILLO",
+  "description": "App de finanzas personales para estudiantes: registra gastos diarios, fija metas semanales con semáforo inteligente y recibe recomendaciones de ahorro con IA sin sacrificar lo necesario.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
