@@ -3,32 +3,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { PROTECTED_CATEGORIES, AIAnalysisResponse, AICutRecommendation } from '../types';
+import {
+  PROTECTED_CATEGORIES,
+  AIAnalysisResponse,
+  RecorteItem,
+  AIReviewData,
+} from '../types';
 
 /**
  * ============================================================================
- * AISLAMIENTO DE LA LLAMADA A LA INTELIGENCIA ARTIFICIAL (SELLO DE IA)
+ * EJEMPLO DE RESPUESTA DE PRUEBA (MOCK) PARA DESARROLLAR SIN GASTAR LLAMADAS
  * ============================================================================
- * 
- * ¿POR QUÉ ESTA LLAMADA VA A TRAVÉS DE UN PROXY SERVER-SIDE?
- * ----------------------------------------------------------------------------
- * 1. SEGURIDAD DE LA API KEY:
- *    La clave de Gemini (GEMINI_API_KEY) NUNCA debe estar en el cliente ni en
- *    el bundle de JavaScript del navegador. Cualquiera podría abrir las
- *    herramientas de desarrollador (F12) y robarla.
- *    Por eso la llamada va a `/api/analyze-expenses`, donde el servidor Express
- *    (server.ts) lee la variable desde process.env de forma confidencial.
- * 
- * 2. PRIVACIDAD ESTUDIANTIL:
- *    El estudiante no envía nombres de compras, notas personales ni marcas.
- *    Solo se envían totales agrupados por categoría y la meta semanal fijada.
- * 
- * 3. DOBLE BARRERA DE PROTECCIÓN (DEFENSE IN DEPTH):
- *    No confiamos ciegamente en que el LLM obedezca. Validamos aquí en código
- *    (y en el servidor) que NINGUNA categoría protegida (Comida, Transporte, Útiles)
- *    sea recortada, y que ningún monto de recorte supere lo gastado esa semana.
- * ============================================================================
+ * Cumple al 100% el esquema responseSchema:
+ * - recortes: lista con categoría, gasto actual, monto sugerido, ahorro y motivo
+ * - ahorro_total_cents
+ * - mensaje_corto
  */
+export const SAMPLE_AI_MOCK_RESPONSE: AIReviewData = {
+  mensaje_corto: 'Te pasaste por $1.00 de tu meta semanal. Tus gastos en Comida, Transporte y Útiles están a salvo.',
+  recortes: [
+    {
+      categoria: 'Ocio',
+      gasto_actual_cents: 500, // $5.00
+      monto_sugerido_cents: 100, // $1.00
+      ahorro_cents: 400, // $4.00
+      motivo: 'Bajar $4.00 de $5.00 espaciando salidas del fin de semana o posponiendo suscripciones.',
+    },
+  ],
+  ahorro_total_cents: 400, // $4.00
+  disclaimer: 'Respuesta de prueba (Mock offline para desarrollo sin costo).',
+};
 
 export interface AnalyzeWeekParams {
   weeklyGoalCents: number;
@@ -42,29 +46,30 @@ export interface AnalyzeWeekParams {
 
 /**
  * Función aislada única para solicitar el análisis de la semana a la IA.
- * Incluye validación de código estricta antes y después de la llamada.
+ * Regla de negocio: si no hay gastos, no se llama a la API.
  */
 export async function analyzeWeekWithAI(params: AnalyzeWeekParams): Promise<AIAnalysisResponse> {
   const { weeklyGoalCents, totalSpentCents, categoryTotals } = params;
 
   // --------------------------------------------------------------------------
-  // PUNTO CRÍTICO 1: Si no hay gastos, NO se llama a la IA.
-  // Regla: "Si la semana no tiene gastos, no se llama a la IA: se muestra un aviso."
+  // REGLA DE NEGOCIO: Si no hay gastos, no se llama a la IA: se muestra un aviso.
   // --------------------------------------------------------------------------
   const activeCategories = categoryTotals.filter((c) => c.totalCents > 0);
   if (activeCategories.length === 0 || totalSpentCents <= 0) {
     return {
       success: false,
-      diagnosis: 'Aún no registraste gastos esta semana.',
-      recommendations: [],
+      data: {
+        mensaje_corto: 'Aún no registraste gastos esta semana.',
+        recortes: [],
+        ahorro_total_cents: 0,
+      },
       error: 'La semana no tiene gastos registrados para analizar.',
     };
   }
 
   try {
     // ------------------------------------------------------------------------
-    // PUNTO CRÍTICO 2: Payload mínimo.
-    // Solo enviamos los totales por categoría y la meta. Nada más.
+    // PRIVACIDAD: Enviamos únicamente los totales por categoría y la meta. Nada más.
     // ------------------------------------------------------------------------
     const payload = {
       weeklyGoalCents,
@@ -89,24 +94,28 @@ export async function analyzeWeekWithAI(params: AnalyzeWeekParams): Promise<AIAn
       throw new Error(errJson.error || `Error del servidor (${response.status})`);
     }
 
-    const rawData = await response.json();
+    const jsonResult = await response.json();
+    const serverData: AIReviewData = jsonResult.data || jsonResult;
 
     // ------------------------------------------------------------------------
-    // PUNTO CRÍTICO 3: Validación exhaustiva en código del lado del cliente.
-    // "Validá esto en código, no confíes en que la IA lo cumpla."
+    // VALIDACIÓN ESTRICTA EN CÓDIGO (DEFENSA EN PROFUNDIDAD):
+    // 1. Regla: Comida, Transporte y Útiles son necesarias -> se descarta cualquier recorte.
+    // 2. Regla: Ningún recorte puede ser mayor a lo gastado (ahorro <= gasto_actual).
+    // 3. Regla: monto_sugerido = gasto_actual - ahorro.
+    // 4. Recalcular ahorro_total_cents.
     // ------------------------------------------------------------------------
-    const sanitizedRecommendations: AICutRecommendation[] = [];
+    const sanitizedRecortes: RecorteItem[] = [];
 
-    for (const rec of rawData.recommendations || []) {
-      const catName = (rec.category || '').trim();
+    for (const item of serverData.recortes || []) {
+      const catName = (item.categoria || '').trim();
 
-      // REGLA INVIOLABLE: Categorías necesarias (Comida, Transporte, Útiles) están protegidas
+      // Regla 1: Descartar si es categoría protegida
       if (isCategoryProtected(catName)) {
-        // Se descarta tajantemente cualquier propuesta sobre necesidades básicas
+        console.warn(`[MI BOLSILLO] Descartado recorte en categoría necesaria: ${catName}`);
         continue;
       }
 
-      // Buscar cuánto se gastó realmente en esa categoría no protegida
+      // Buscar el gasto real registrado en la categoría
       const realCat = activeCategories.find(
         (c) => c.category.toLowerCase() === catName.toLowerCase()
       );
@@ -115,96 +124,94 @@ export async function analyzeWeekWithAI(params: AnalyzeWeekParams): Promise<AIAn
         continue;
       }
 
-      // REGLA INVIOLABLE: El recorte no puede superar lo gastado en la semana
-      let cutAmount = Math.round(Number(rec.cutAmountCents) || 0);
-      if (cutAmount > realCat.totalCents) {
-        cutAmount = realCat.totalCents;
+      // Regla 2: El recorte jamás puede superar lo gastado
+      let safeAhorro = Math.round(Number(item.ahorro_cents) || 0);
+      if (safeAhorro > realCat.totalCents) {
+        safeAhorro = realCat.totalCents;
       }
 
-      // REGLA INVIOLABLE: Monto concreto mayor a cero
-      if (cutAmount <= 0) {
+      if (safeAhorro <= 0) {
         continue;
       }
 
-      // Generar explicación limpia con montos en dólares legibles
-      const cutDollars = (cutAmount / 100).toFixed(2);
+      const safeMontoSugerido = realCat.totalCents - safeAhorro;
+      const cutDollars = (safeAhorro / 100).toFixed(2);
       const spentDollars = (realCat.totalCents / 100).toFixed(2);
-      const cleanExplanation =
-        rec.explanation && rec.explanation.includes(catName)
-          ? rec.explanation
-          : `${catName}: bajá $${cutDollars} de $${spentDollars}`;
 
-      sanitizedRecommendations.push({
-        category: realCat.category,
-        cutAmountCents: cutAmount,
-        currentSpentCents: realCat.totalCents,
-        explanation: cleanExplanation,
+      const motivo =
+        item.motivo && item.motivo.length > 5
+          ? item.motivo
+          : `Bajar $${cutDollars} de $${spentDollars} posponiendo gastos no prioritarios`;
+
+      sanitizedRecortes.push({
+        categoria: realCat.category,
+        gasto_actual_cents: realCat.totalCents,
+        monto_sugerido_cents: safeMontoSugerido,
+        ahorro_cents: safeAhorro,
+        motivo,
       });
     }
 
-    // Si la IA no devolvió recortes en categorías no protegidas pero el estudiante se pasó,
-    // construimos un recorte garantizado sobre las categorías no protegidas disponibles
-    if (sanitizedRecommendations.length === 0 && totalSpentCents > weeklyGoalCents) {
-      const nonProtected = activeCategories.filter((c) => !isCategoryProtected(c.category));
-      for (const cat of nonProtected) {
-        const excessCents = totalSpentCents - weeklyGoalCents;
-        // Cortar lo necesario para volver a la meta sin exceder lo gastado en esta categoría
-        const cut = Math.min(cat.totalCents, Math.max(100, Math.min(cat.totalCents, excessCents)));
-        sanitizedRecommendations.push({
-          category: cat.category,
-          cutAmountCents: cut,
-          currentSpentCents: cat.totalCents,
-          explanation: `${cat.category}: bajá $${(cut / 100).toFixed(2)} de $${(cat.totalCents / 100).toFixed(2)}`,
+    const ahorroTotal = sanitizedRecortes.reduce((acc, r) => acc + r.ahorro_cents, 0);
+
+    return {
+      success: true,
+      data: {
+        mensaje_corto:
+          serverData.mensaje_corto ||
+          (totalSpentCents > weeklyGoalCents
+            ? `Superaste tu presupuesto semanal. Se proponen recortes en gastos no esenciales.`
+            : 'Vas dentro de tu presupuesto semanal.'),
+        recortes: sanitizedRecortes,
+        ahorro_total_cents: ahorroTotal,
+        disclaimer: serverData.disclaimer,
+      },
+    };
+  } catch (error: any) {
+    // ------------------------------------------------------------------------
+    // MANEJO DE FALLO: Si la IA falla, responde lento o no cumple el esquema,
+    // el resto de la app sigue funcionando y mostramos un análisis garantizado.
+    // ------------------------------------------------------------------------
+    console.warn('[MI BOLSILLO] Servicio en la nube no disponible o timeout:', error?.message);
+
+    const nonProtected = activeCategories.filter((c) => !isCategoryProtected(c.category));
+    const fallbackRecortes: RecorteItem[] = [];
+
+    const overBudget = totalSpentCents > weeklyGoalCents;
+    const excessCents = Math.max(0, totalSpentCents - weeklyGoalCents);
+
+    for (const cat of nonProtected) {
+      const cut = overBudget
+        ? Math.min(cat.totalCents, Math.max(100, Math.min(cat.totalCents, excessCents)))
+        : Math.round(cat.totalCents * 0.4);
+
+      if (cut > 0) {
+        fallbackRecortes.push({
+          categoria: cat.category,
+          gasto_actual_cents: cat.totalCents,
+          monto_sugerido_cents: cat.totalCents - cut,
+          ahorro_cents: cut,
+          motivo: `Bajar $${(cut / 100).toFixed(2)} de $${(cat.totalCents / 100).toFixed(2)} espaciando salidas`,
         });
       }
     }
 
-    return {
-      success: true,
-      diagnosis: rawData.diagnosis || 'Análisis completado para tu semana.',
-      recommendations: sanitizedRecommendations,
-      savingsTip: rawData.savingsTip || 'Llevá siempre un registro diario para no perder el control.',
-      disclaimer: rawData.disclaimer,
-    };
-  } catch (error: any) {
-    // ------------------------------------------------------------------------
-    // PUNTO CRÍTICO 4: Si la llamada falla, mostrar mensaje claro y que
-    // el resto de la app siga funcionando sin romper la pantalla.
-    // ------------------------------------------------------------------------
-    console.warn('[MI BOLSILLO] Notificación de servicio IA:', error?.message || error);
-
-    // Generamos recomendación local de rescate para asegurar que el estudiante
-    // obtenga valor inmediatamente incluso sin conexión a la nube
-    const localRecommendations: AICutRecommendation[] = [];
-    const nonProtected = activeCategories.filter((c) => !isCategoryProtected(c.category));
-
-    for (const cat of nonProtected) {
-      const cut = Math.min(cat.totalCents, Math.max(100, Math.round(cat.totalCents * 0.8)));
-      localRecommendations.push({
-        category: cat.category,
-        cutAmountCents: cut,
-        currentSpentCents: cat.totalCents,
-        explanation: `${cat.category}: bajá $${(cut / 100).toFixed(2)} de $${(cat.totalCents / 100).toFixed(2)}`,
-      });
-    }
+    const ahorroTotal = fallbackRecortes.reduce((acc, r) => acc + r.ahorro_cents, 0);
 
     return {
       success: true,
-      diagnosis:
-        totalSpentCents > weeklyGoalCents
-          ? `Te pasaste de tu meta semanal. Tus categorías esenciales (Comida, Transporte, Útiles) están protegidas.`
+      data: {
+        mensaje_corto: overBudget
+          ? `Te pasaste por $${(excessCents / 100).toFixed(2)} de tu meta semanal. Tus gastos en Comida, Transporte y Útiles están a salvo.`
           : 'Vas dentro de tu presupuesto semanal.',
-      recommendations: localRecommendations,
-      savingsTip: 'Comprá en el supermercado antes de ir a cursar para evitar gastos imprevistos.',
-      disclaimer: 'Análisis generado localmente (modo sin conexión disponible).',
+        recortes: fallbackRecortes,
+        ahorro_total_cents: ahorroTotal,
+        disclaimer: 'Análisis generado con motor local seguro de respaldo.',
+      },
     };
   }
 }
 
-/**
- * Comprueba si una categoría está dentro de las necesidades básicas protegidas.
- * Se realiza comprobación insensible a mayúsculas y acentos.
- */
 export function isCategoryProtected(categoryName: string): boolean {
   if (!categoryName) return false;
   const normalized = categoryName.trim().toLowerCase();

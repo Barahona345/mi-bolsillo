@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Categorías protegidas que cubren lo básico del estudiante
+// Categorías básicas necesarias protegidas (NO recortables)
 export const PROTECTED_CATEGORIES: readonly string[] = ['Comida', 'Transporte', 'Útiles'] as const;
 
 export type ProtectedCategory = (typeof PROTECTED_CATEGORIES)[number];
@@ -16,9 +16,9 @@ export interface CategoryInfo {
 }
 
 export const APP_CATEGORIES: CategoryInfo[] = [
-  { name: 'Comida', isProtected: true, icon: 'Utensils', description: 'Almuerzos, merienda diaria (Protegido)' },
-  { name: 'Transporte', isProtected: true, icon: 'Bus', description: 'Boleto, subte, colectivo (Protegido)' },
-  { name: 'Útiles', isProtected: true, icon: 'BookOpen', description: 'Fotocopias, cuadernos, librería (Protegido)' },
+  { name: 'Comida', isProtected: true, icon: 'Utensils', description: 'Almuerzos, viandas y comida diaria (Protegido)' },
+  { name: 'Transporte', isProtected: true, icon: 'Bus', description: 'Boleto, colectivo, subte (Protegido)' },
+  { name: 'Útiles', isProtected: true, icon: 'BookOpen', description: 'Fotocopias, libros, apuntes (Protegido)' },
   { name: 'Ocio', isProtected: false, icon: 'Gamepad2', description: 'Juegos, salidas, streaming' },
   { name: 'Snacks & Salidas', isProtected: false, icon: 'Coffee', description: 'Golosinas, café al paso, juntadas' },
   { name: 'Otros', isProtected: false, icon: 'Tag', description: 'Gastos varios o imprevistos no esenciales' },
@@ -26,9 +26,9 @@ export const APP_CATEGORIES: CategoryInfo[] = [
 
 export interface Expense {
   id: string;
-  amountCents: number; // Monto en centavos (ej: $12.00 = 1200)
+  amountCents: number; // Monto en centavos enteros (ej: $12.00 = 1200)
   category: string;
-  date: string; // ISO 8601 string, se guarda automáticamente
+  date: string; // ISO 8601 string automática
 }
 
 export interface WeekData {
@@ -37,39 +37,27 @@ export interface WeekData {
 }
 
 export interface AllWeeksStorage {
-  [weekKey: string]: WeekData; // clave tipo "2026-W40"
+  [weekKey: string]: WeekData; // clave tipo "YYYY-MM-DD" del lunes
 }
 
-export interface CategorySummary {
-  category: string;
-  totalCents: number;
-  isProtected: boolean;
-  expenseCount: number;
+// Estructura fija JSON devuelta por Gemini (responseSchema)
+export interface RecorteItem {
+  categoria: string;
+  gasto_actual_cents: number;
+  monto_sugerido_cents: number;
+  ahorro_cents: number;
+  motivo: string;
 }
 
-export interface AIAnalysisRequest {
-  weekKey: string;
-  weeklyGoalCents: number;
-  totalSpentCents: number;
-  categories: {
-    category: string;
-    totalCents: number;
-    isProtected: boolean;
-  }[];
-}
-
-export interface AICutRecommendation {
-  category: string;
-  cutAmountCents: number; // Monto concreto en centavos (<= total gastado en la categoría)
-  currentSpentCents: number;
-  explanation: string;
+export interface AIReviewData {
+  mensaje_corto: string;
+  recortes: RecorteItem[];
+  ahorro_total_cents: number;
+  disclaimer?: string;
 }
 
 export interface AIAnalysisResponse {
   success: boolean;
-  diagnosis: string;
-  recommendations: AICutRecommendation[];
-  savingsTip?: string;
-  disclaimer?: string;
+  data: AIReviewData;
   error?: string;
 }

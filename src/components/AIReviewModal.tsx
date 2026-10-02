@@ -6,7 +6,7 @@
 import React from 'react';
 import { AIAnalysisResponse } from '../types';
 import { formatCents } from '../utils/currencyUtils';
-import { Sparkles, ShieldCheck, X, AlertCircle, ArrowDownCircle, Lightbulb } from 'lucide-react';
+import { Sparkles, ShieldCheck, X, AlertCircle, ArrowDownCircle, CheckCircle2 } from 'lucide-react';
 
 interface AIReviewModalProps {
   isOpen: boolean;
@@ -26,6 +26,8 @@ export const AIReviewModal: React.FC<AIReviewModalProps> = ({
   errorMessage,
 }) => {
   if (!isOpen) return null;
+
+  const data = analysis?.data;
 
   return (
     <div
@@ -50,10 +52,10 @@ export const AIReviewModal: React.FC<AIReviewModalProps> = ({
           </div>
           <div>
             <h2 id="ai-review-title" className="font-black text-slate-950 text-xl leading-tight">
-              Revisar mi semana
+              Propuestas de Ahorro
             </h2>
             <p className="text-base font-semibold text-slate-700">
-              Análisis cuidando siempre tus gastos básicos
+              Análisis inteligente de gastos
             </p>
           </div>
         </div>
@@ -63,15 +65,15 @@ export const AIReviewModal: React.FC<AIReviewModalProps> = ({
           <div className="py-10 text-center space-y-4">
             <div className="w-14 h-14 rounded-full border-4 border-slate-200 border-t-slate-900 animate-spin mx-auto" />
             <div>
-              <p className="font-black text-slate-950 text-lg">Analizando tus números...</p>
+              <p className="font-black text-slate-950 text-lg">Analizando tus números con Gemini...</p>
               <p className="text-base font-semibold text-slate-700 mt-1 max-w-xs mx-auto">
-                Comprobando que la comida, el transporte y los útiles estén protegidos.
+                Verificando que la comida, el transporte y los útiles estén 100% blindados.
               </p>
             </div>
           </div>
         )}
 
-        {/* Mensaje de error sin tecnicismos */}
+        {/* Mensaje de error / fallo */}
         {!isLoading && errorMessage && (
           <div className="py-6 text-center space-y-4">
             <div className="w-14 h-14 bg-rose-100 text-rose-900 rounded-full flex items-center justify-center mx-auto border-2 border-rose-900">
@@ -90,90 +92,117 @@ export const AIReviewModal: React.FC<AIReviewModalProps> = ({
           </div>
         )}
 
-        {/* Contenido del análisis */}
-        {!isLoading && !errorMessage && analysis && (
+        {/* 2. Visualización estructurada como dato (tarjetas / tabla) */}
+        {!isLoading && !errorMessage && data && (
           <div className="space-y-4">
-            {/* Garantía de protección */}
+            {/* Regla de negocio: Necesarias protegidas */}
             <div className="bg-emerald-100 border-2 border-emerald-900 rounded-2xl p-4 flex items-start gap-3">
               <ShieldCheck className="w-6 h-6 text-emerald-950 shrink-0 mt-0.5" />
               <div>
                 <span className="text-base font-black text-emerald-950 block">
-                  Comida, Transporte y Útiles protegidos
+                  Comida, Transporte y Útiles Intocables
                 </span>
                 <p className="text-base font-semibold text-emerald-900 leading-snug mt-0.5">
-                  La IA no te propone recortar en lo que necesitás para el día a día.
+                  La IA tiene prohibido recortar en lo que necesitás para estudiar y vivir el día a día.
                 </p>
               </div>
             </div>
 
-            {/* Diagnóstico */}
+            {/* Mensaje corto / Diagnóstico */}
             <div className="bg-slate-100 border-2 border-slate-900 rounded-2xl p-4">
               <span className="text-base font-black text-slate-700 uppercase tracking-wide block mb-1">
-                Resumen de tu semana
+                Diagnóstico
               </span>
               <p className="text-base font-bold text-slate-950 leading-snug">
-                {analysis.diagnosis}
+                {data.mensaje_corto}
               </p>
             </div>
 
-            {/* Propuestas de recorte */}
+            {/* Ahorro Total Detectado */}
+            {data.ahorro_total_cents > 0 && (
+              <div className="bg-indigo-100 border-2 border-indigo-900 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-base font-black text-indigo-950 block">
+                    Ahorro total sugerido:
+                  </span>
+                  <span className="text-base font-semibold text-indigo-900">
+                    En categorías no esenciales
+                  </span>
+                </div>
+                <span className="text-2xl font-black text-indigo-950 bg-white px-3 py-1 rounded-xl border-2 border-indigo-900">
+                  {formatCents(data.ahorro_total_cents)}
+                </span>
+              </div>
+            )}
+
+            {/* 2. Lista de Recortes como Datos Estructurados (Tabla / Fichas) */}
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <ArrowDownCircle className="w-5 h-5 text-slate-900" />
                 <h3 className="text-base font-black text-slate-950 uppercase tracking-wide">
-                  Dónde recortar con montos exactos
+                  Tabla de recortes sugeridos
                 </h3>
               </div>
 
-              {analysis.recommendations.length === 0 ? (
+              {data.recortes.length === 0 ? (
                 <div className="bg-slate-50 border-2 border-slate-400 rounded-2xl p-4 text-center">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-700 mx-auto mb-1" />
                   <p className="text-base font-bold text-slate-800">
-                    No hace falta recortar en tus gastos no esenciales esta semana.
+                    No se sugieren recortes en tus gastos no esenciales esta semana.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {analysis.recommendations.map((rec, idx) => (
+                  {data.recortes.map((item, idx) => (
                     <div
                       key={idx}
-                      className="bg-indigo-50 border-2 border-indigo-900 rounded-2xl p-4"
+                      className="bg-white border-2 border-slate-900 rounded-2xl p-4 shadow-sm"
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-base font-black text-indigo-950">
-                          {rec.category}
+                        <span className="text-lg font-black text-slate-950">
+                          {item.categoria}
                         </span>
-                        <span className="text-base font-black text-indigo-950 bg-white px-2.5 py-1 rounded-xl border border-indigo-900">
-                          Bajar {formatCents(rec.cutAmountCents)}
+                        <span className="text-base font-black text-rose-700 bg-rose-50 px-2.5 py-1 rounded-xl border border-rose-300">
+                          Ahorro: {formatCents(item.ahorro_cents)}
                         </span>
                       </div>
 
-                      <p className="text-lg font-black text-slate-950 leading-snug">
-                        {rec.explanation}
+                      {/* Tabla de cifras cuantitativas */}
+                      <div className="grid grid-cols-2 gap-2 my-2 p-2 bg-slate-50 border border-slate-300 rounded-xl text-center">
+                        <div>
+                          <span className="text-base font-semibold text-slate-600 block">
+                            Gasto actual
+                          </span>
+                          <span className="text-base font-black text-slate-950 block">
+                            {formatCents(item.gasto_actual_cents)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-base font-semibold text-slate-600 block">
+                            Monto sugerido
+                          </span>
+                          <span className="text-base font-black text-emerald-800 block">
+                            {formatCents(item.monto_sugerido_cents)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Motivo de la sugerencia */}
+                      <p className="text-base font-semibold text-slate-800 leading-snug mt-2">
+                        <strong className="text-slate-950">Motivo:</strong> {item.motivo}
                       </p>
-
-                      <div className="flex items-center justify-between text-base font-bold text-slate-700 mt-2 pt-2 border-t border-indigo-200">
-                        <span>Gastado: {formatCents(rec.currentSpentCents)}</span>
-                        <span>
-                          Quedaría: {formatCents(Math.max(0, rec.currentSpentCents - rec.cutAmountCents))}
-                        </span>
-                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Tip de ahorro */}
-            {analysis.savingsTip && (
-              <div className="bg-amber-100 border-2 border-amber-900 rounded-2xl p-4 flex items-start gap-3">
-                <Lightbulb className="w-6 h-6 text-amber-950 shrink-0 mt-0.5" />
-                <p className="text-base font-bold text-amber-950 leading-snug">
-                  <strong>Consejo práctico:</strong> {analysis.savingsTip}
-                </p>
-              </div>
+            {data.disclaimer && (
+              <p className="text-base font-semibold text-slate-600 text-center italic mt-2">
+                {data.disclaimer}
+              </p>
             )}
 
-            {/* Único botón principal del modal de análisis */}
             <button
               onClick={onClose}
               className="w-full min-h-[54px] py-3.5 bg-slate-950 hover:bg-slate-900 text-white font-black rounded-2xl text-lg transition-all shadow-md cursor-pointer mt-3 border-2 border-black"

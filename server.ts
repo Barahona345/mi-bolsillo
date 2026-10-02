@@ -122,37 +122,46 @@ REGLAS ESTRICTAS E INVIOLABLES:
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            diagnosis: {
+            mensaje_corto: {
               type: Type.STRING,
-              description: 'Diagnóstico breve de la semana en 1 o 2 oraciones.',
+              description: 'Diagnóstico o mensaje corto de la semana en 1 o 2 oraciones.',
             },
-            recommendations: {
+            recortes: {
               type: Type.ARRAY,
+              description: 'Lista de propuestas de recorte en categorías no protegidas',
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  category: {
+                  categoria: {
                     type: Type.STRING,
                     description: 'Nombre de la categoría no protegida (ej: Ocio)',
                   },
-                  cutAmountCents: {
+                  gasto_actual_cents: {
                     type: Type.INTEGER,
-                    description: 'Monto concreto a recortar en centavos (ej: 400 para $4)',
+                    description: 'Gasto actual en la categoría en centavos',
                   },
-                  explanation: {
+                  monto_sugerido_cents: {
+                    type: Type.INTEGER,
+                    description: 'Monto propuesto tras el recorte en centavos',
+                  },
+                  ahorro_cents: {
+                    type: Type.INTEGER,
+                    description: 'Monto concreto que se ahorra en centavos',
+                  },
+                  motivo: {
                     type: Type.STRING,
-                    description: 'Explicación del recorte con montos (ej: Ocio: bajá $4 de $5)',
+                    description: 'Motivo concreto de la sugerencia',
                   },
                 },
-                required: ['category', 'cutAmountCents', 'explanation'],
+                required: ['categoria', 'gasto_actual_cents', 'monto_sugerido_cents', 'ahorro_cents', 'motivo'],
               },
             },
-            savingsTip: {
-              type: Type.STRING,
-              description: 'Consejo práctico y rápido para ahorrar en el día a día',
+            ahorro_total_cents: {
+              type: Type.INTEGER,
+              description: 'Suma de todos los ahorros en centavos',
             },
           },
-          required: ['diagnosis', 'recommendations'],
+          required: ['mensaje_corto', 'recortes', 'ahorro_total_cents'],
         },
       },
     });
@@ -176,10 +185,10 @@ REGLAS ESTRICTAS E INVIOLABLES:
     // 2. Limitar el recorte al monto real gastado en la categoría
     // 3. Descartar montos <= 0
     // ========================================================================
-    const validatedRecommendations = [];
+    const validatedRecortes = [];
 
-    for (const rec of parsedData.recommendations || []) {
-      const catName = (rec.category || '').trim();
+    for (const rec of parsedData.recortes || []) {
+      const catName = (rec.categoria || '').trim();
       const isProtected = PROTECTED_CATEGORIES.some(
         (p) => p.toLowerCase() === catName.toLowerCase()
       );
@@ -199,58 +208,69 @@ REGLAS ESTRICTAS E INVIOLABLES:
         continue;
       }
 
-      // Regla 2: El recorte no puede superar lo gastado
-      let safeCutCents = Math.round(Number(rec.cutAmountCents) || 0);
-      if (safeCutCents > realCategory.totalCents) {
-        safeCutCents = realCategory.totalCents;
+      // Regla 2: El recorte no puede superar lo gastado (ahorro <= gasto_actual)
+      let safeAhorroCents = Math.round(Number(rec.ahorro_cents) || 0);
+      if (safeAhorroCents > realCategory.totalCents) {
+        safeAhorroCents = realCategory.totalCents;
       }
 
-      // Regla 3: El recorte debe ser mayor a 0
-      if (safeCutCents <= 0) {
+      // Descartar si el ahorro es <= 0
+      if (safeAhorroCents <= 0) {
         continue;
       }
 
-      // Formatear explicación clara si la IA no incluyó el formato pedido
-      const cutDollars = (safeCutCents / 100).toFixed(2);
+      const safeMontoSugerido = realCategory.totalCents - safeAhorroCents;
+      const cutDollars = (safeAhorroCents / 100).toFixed(2);
       const spentDollars = (realCategory.totalCents / 100).toFixed(2);
-      const explanation = rec.explanation && rec.explanation.length > 5
-        ? rec.explanation
-        : `${realCategory.category}: bajá $${cutDollars} de $${spentDollars}`;
 
-      validatedRecommendations.push({
-        category: realCategory.category,
-        cutAmountCents: safeCutCents,
-        currentSpentCents: realCategory.totalCents,
-        explanation,
+      const motivo =
+        rec.motivo && rec.motivo.length > 5
+          ? rec.motivo
+          : `Bajar $${cutDollars} de $${spentDollars} postergando compras no prioritarias`;
+
+      validatedRecortes.push({
+        categoria: realCategory.category,
+        gasto_actual_cents: realCategory.totalCents,
+        monto_sugerido_cents: safeMontoSugerido,
+        ahorro_cents: safeAhorroCents,
+        motivo,
       });
     }
 
     // Si la IA no encontró recortes válidos pero hay exceso de presupuesto,
     // garantizamos una propuesta en categorías no esenciales (ej. Ocio)
-    if (validatedRecommendations.length === 0 && overBudget) {
+    if (validatedRecortes.length === 0 && overBudget) {
       const fallback = generateLocalCutRecommendations(weeklyGoalCents, totalSpentCents, activeCategories);
       return res.json({
         success: true,
-        diagnosis: parsedData.diagnosis || 'Revisamos tus números: estás por encima de tu meta semanal.',
-        recommendations: fallback.recommendations,
-        savingsTip: parsedData.savingsTip || 'Llevá tu botella de agua y planificá las meriendas antes de salir.',
+        data: fallback.data,
       });
     }
 
+    const ahorroTotal = validatedRecortes.reduce((acc, r) => acc + r.ahorro_cents, 0);
+
     return res.json({
       success: true,
-      diagnosis: parsedData.diagnosis || (overBudget ? `Te pasaste por $${(differenceCents / 100).toFixed(2)} de tu meta.` : '¡Estás cuidando tu presupuesto!'),
-      recommendations: validatedRecommendations,
-      savingsTip: parsedData.savingsTip || 'Priorizá lo necesario y dejá el ocio para cuando haya margen.',
+      data: {
+        mensaje_corto:
+          parsedData.mensaje_corto ||
+          (overBudget
+            ? `Te pasaste por $${(differenceCents / 100).toFixed(2)} de tu meta.`
+            : '¡Vas dentro de tu presupuesto!'),
+        recortes: validatedRecortes,
+        ahorro_total_cents: ahorroTotal,
+      },
     });
   } catch (error: any) {
     console.error('[MI BOLSILLO] Error al llamar a Gemini API:', error?.message || error);
-    // En caso de fallo de la API, devolver un análisis garantizado con reglas de código
-    // para que la app siga funcionando de forma fluida y sin interrupciones
+    // En caso de fallo de la API o timeout, devolver un análisis garantizado con reglas de código
     const fallback = generateLocalCutRecommendations(weeklyGoalCents, totalSpentCents, activeCategories);
     return res.json({
-      ...fallback,
-      disclaimer: 'Análisis generado con motor local de respaldo debido a alta demanda del servicio.',
+      success: true,
+      data: {
+        ...fallback.data,
+        disclaimer: 'Análisis generado con motor local seguro de respaldo.',
+      },
     });
   }
 });
@@ -272,43 +292,43 @@ function generateLocalCutRecommendations(
     return !PROTECTED_CATEGORIES.some((p) => p.toLowerCase() === c.category.toLowerCase()) && c.totalCents > 0;
   });
 
-  const recommendations = [];
+  const recortes = [];
 
   for (const cat of nonProtected) {
-    // Si estamos pasados de presupuesto, proponemos recortar el exceso o una parte significativa
     let cutCents: number;
     if (overBudget) {
-      // Si el exceso es $1.00 (100 centavos) y gastó $5.00 (500 centavos) en Ocio,
-      // sugerir recortar entre $1.00 y $4.00 de $5.00
-      // En el criterio de aceptación se espera: "Ocio: bajá $4 de $10" o "$X de $Y"
       const maxPossibleCut = Math.min(cat.totalCents, Math.max(excessCents, Math.round(cat.totalCents * 0.8)));
       cutCents = Math.max(100, Math.min(cat.totalCents, maxPossibleCut));
     } else {
-      // Sugerencia preventiva
       cutCents = Math.round(cat.totalCents * 0.4);
     }
 
     if (cutCents > 0) {
       const cutDollars = (cutCents / 100).toFixed(2);
       const spentDollars = (cat.totalCents / 100).toFixed(2);
-      recommendations.push({
-        category: cat.category,
-        cutAmountCents: cutCents,
-        currentSpentCents: cat.totalCents,
-        explanation: `${cat.category}: bajá $${cutDollars} de $${spentDollars} postergando compras no urgentes`,
+      recortes.push({
+        categoria: cat.category,
+        gasto_actual_cents: cat.totalCents,
+        monto_sugerido_cents: cat.totalCents - cutCents,
+        ahorro_cents: cutCents,
+        motivo: `Bajar $${cutDollars} de $${spentDollars} postergando compras no prioritarias`,
       });
     }
   }
 
-  const diagnosis = overBudget
+  const ahorroTotal = recortes.reduce((acc, r) => acc + r.ahorro_cents, 0);
+
+  const mensaje_corto = overBudget
     ? `Te pasaste por $${(excessCents / 100).toFixed(2)} de tu meta semanal. Tus gastos en Comida, Transporte y Útiles están a salvo.`
-    : `Vas dentro de tu presupuesto. Mantén protegidos tus gastos básicos para terminar la semana con tranquilidad.`;
+    : `Vas dentro de tu presupuesto semanal. Mantén protegidos tus gastos básicos.`;
 
   return {
     success: true,
-    diagnosis,
-    recommendations,
-    savingsTip: 'Comprá snacks en el supermercado antes de ir a cursar en lugar de los kioscos de la facultad.',
+    data: {
+      mensaje_corto,
+      recortes,
+      ahorro_total_cents: ahorroTotal,
+    },
   };
 }
 
